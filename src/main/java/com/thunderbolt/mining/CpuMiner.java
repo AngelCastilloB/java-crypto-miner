@@ -245,6 +245,14 @@ public class CpuMiner implements IMiner
                 break;
 
             byte[] serializedNonce = NumberSerializer.serialize((int)currentNonce);
+            s_logger.debug("Nonce {}", Convert.toHexString(serializedNonce));
+            try
+            {
+                Thread.sleep(1000);
+            } catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
             System.arraycopy(serializedNonce, 0, data, 12, serializedNonce.length);
         }
 

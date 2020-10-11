@@ -73,10 +73,20 @@ public class Job
         m_data = data;
         setId(id);
 
+        s_logger.debug(Convert.toHexString(m_data));
 
         ByteBuffer dataBuffer = ByteBuffer.wrap(m_data);
         dataBuffer.position(8);
-        m_target = dataBuffer.getInt() & 0xffffffffL;
+
+        int tmp = Integer.reverseBytes(dataBuffer.getInt());
+        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(tmp)));
+
+        tmp = Integer.reverseBytes(tmp);
+        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(tmp)));
+
+        m_target = tmp & 0xffffffffL;
+        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(m_target)));
+
         m_nonce  = dataBuffer.getInt() & 0xffffffffL;
     }
 
@@ -94,7 +104,7 @@ public class Job
 
         ByteBuffer dataBuffer = ByteBuffer.wrap(m_data);
         dataBuffer.position(8);
-        m_target = dataBuffer.getInt() & 0xffffffffL;
+        m_target = Integer.reverse(dataBuffer.getInt()) & 0xffffffffL;
         m_nonce  = dataBuffer.getInt() & 0xffffffffL;
     }
 
@@ -186,7 +196,7 @@ public class Job
      */
     public void setSolved(boolean solved)
     {
-        this.m_solved = solved;
+        m_solved = solved;
     }
 
     /**
