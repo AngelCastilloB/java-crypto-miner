@@ -26,6 +26,8 @@ import com.thunderbolt.mining.miners.GekkoScienceNewpacMiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
+
 /* IMPLEMENTATION ************************************************************/
 
 
@@ -45,7 +47,7 @@ public class Main
     public static void main(String[] args) throws InterruptedException
     {
         byte[] midstate = Convert.hexStringToByteArray("05D387352B75D4529F235910CCDDAEB836B7C9629AB6DFAF4249F9CAB90B4481");
-        byte[] data     = Convert.hexStringToByteArray("1B4FBE471EB4E55AFFFF001D00000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000280");
+        byte[] data     = Convert.hexStringToByteArray("1B4FBE471EB4E55AFFFF001D7891EA91800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000280");
 
         GekkoScienceNewpacMiner miner = new GekkoScienceNewpacMiner();
 
@@ -53,9 +55,12 @@ public class Main
         {
             s_logger.debug("Job {} ended.", ended.getId());
             s_logger.debug("Block {}.", ended.isSolved() ? "Solved" : "Not Solved");
+
+            // Nonce must be provided to the application as big endian. Since it will be reverted before hashing
+            // so we need to make sure that when it is reverted the hash matches.
             s_logger.debug("Nonce: {} ({})",
-                    Convert.toHexString(NumberSerializer.serialize(ended.getNonce())),
-                    ended.getNonce());
+                    Convert.toHexString(NumberSerializer.serialize(Integer.reverseBytes((int)ended.getNonce()))),
+                    Integer.reverseBytes((int)ended.getNonce()));
             s_logger.debug("Hash:  {}",
                     Convert.toHexString(ended.getHash().getData()));
 
@@ -65,21 +70,9 @@ public class Main
 
         miner.start();
 
-        Job job  = new Job (midstate, data,(short)0x75);
-        job.setNonce(0);
+        Job job  = new Job(midstate, data,(short)0x75);
         miner.queueJob(job);
 
-        Thread.sleep(5000);
-        miner.reset();
-        miner.queueJob(job);
-
-        Thread.sleep(5000);
-        miner.reset();
-        miner.queueJob(job);
-
-        Thread.sleep(5000);
-        miner.reset();
-        miner.queueJob(job);
         while(true)
         {
             Thread.sleep(100);
