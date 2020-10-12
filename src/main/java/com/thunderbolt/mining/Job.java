@@ -26,14 +26,13 @@ package com.thunderbolt.mining;
 
 /* IMPORTS *******************************************************************/
 
-import com.thunderbolt.Main;
 import com.thunderbolt.common.Convert;
 import com.thunderbolt.common.NumberSerializer;
+import com.thunderbolt.security.Sha256Digester;
 import com.thunderbolt.security.Sha256Hash;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 /* IMPLEMENTATION ************************************************************/
@@ -54,7 +53,7 @@ public class Job
     // Private fields
     private byte[]     m_midstate = new byte[MIDSTATE_SIZE];
     private byte[]     m_data     = new byte[DATA_SIZE];
-    private int        m_id       = 0;
+    private short      m_id       = 0;
     private boolean    m_solved   = false;
     private long       m_nonce    = 0;
     private long       m_target   = 0;
@@ -67,26 +66,16 @@ public class Job
      * @param data     The remaining data to be hashed.
      * @param id       The id assigned to this Job.
      */
-    public Job(byte[] midstate, byte[] data, int id)
+    public Job(byte[] midstate, byte[] data, short id)
     {
         m_midstate = midstate;
         m_data = data;
         setId(id);
 
-        s_logger.debug(Convert.toHexString(m_data));
-
         ByteBuffer dataBuffer = ByteBuffer.wrap(m_data);
         dataBuffer.position(8);
 
-        int tmp = Integer.reverseBytes(dataBuffer.getInt());
-        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(tmp)));
-
-        tmp = Integer.reverseBytes(tmp);
-        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(tmp)));
-
-        m_target = tmp & 0xffffffffL;
-        s_logger.debug(Convert.toHexString(NumberSerializer.serialize(m_target)));
-
+        m_target = Integer.reverseBytes(dataBuffer.getInt()) & 0xffffffffL;
         m_nonce  = dataBuffer.getInt() & 0xffffffffL;
     }
 
@@ -96,7 +85,7 @@ public class Job
      * @param payload A bytebuffer containing the Job data.
      * @param id       The id assigned to this Job.
      */
-    public Job(ByteBuffer payload, int id)
+    public Job(ByteBuffer payload, short id)
     {
         payload.get(m_midstate);
         payload.get(m_data);
@@ -104,7 +93,7 @@ public class Job
 
         ByteBuffer dataBuffer = ByteBuffer.wrap(m_data);
         dataBuffer.position(8);
-        m_target = Integer.reverse(dataBuffer.getInt()) & 0xffffffffL;
+        m_target = Integer.reverseBytes(dataBuffer.getInt()) & 0xffffffffL; // Little endian.
         m_nonce  = dataBuffer.getInt() & 0xffffffffL;
     }
 
@@ -114,7 +103,7 @@ public class Job
      * @param payload A byte array containing the Job data.
      * @param id      The id assigned to this Job.
      */
-    public Job(byte[] payload, int id)
+    public Job(byte[] payload, short id)
     {
         this(ByteBuffer.wrap(payload), id);
     }
@@ -164,7 +153,7 @@ public class Job
      *
      * @return the id.
      */
-    public int getId()
+    public short getId()
     {
         return m_id;
     }
@@ -174,7 +163,7 @@ public class Job
      *
      * @param id The id.
      */
-    public void setId(int id)
+    public void setId(short id)
     {
         m_id = id;
     }
@@ -217,6 +206,17 @@ public class Job
     public void setNonce(long nonce)
     {
         m_nonce = nonce;
+        byte[] data = m_data.clone();
+
+        byte[] serializedNonce = NumberSerializer.serialize((int)m_nonce);
+        System.arraycopy(serializedNonce, 0, data, 12, serializedNonce.length);
+
+        s_logger.debug(Convert.toHexString(serializedNonce));
+        s_logger.debug(Convert.toHexString(data));
+        s_logger.debug(Convert.toHexString(m_midstate));
+        Sha256Digester digester = new Sha256Digester();
+
+        m_hash = Sha256Digester.digest(digester.continuePreviousHash(m_midstate, data)).reverse();
     }
 
     /**

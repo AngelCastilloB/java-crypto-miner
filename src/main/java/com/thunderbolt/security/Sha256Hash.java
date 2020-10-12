@@ -18,6 +18,8 @@ package com.thunderbolt.security;
 
 /* IMPORTS *******************************************************************/
 
+import com.thunderbolt.common.Convert;
+
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -78,6 +80,16 @@ public class Sha256Hash
     public byte[] serialize()
     {
         return getData();
+    }
+
+    /**
+     * Returns the hash with all bytes reversed.
+     *
+     * @return The new hash.
+     */
+    public Sha256Hash reverse()
+    {
+        return new Sha256Hash(Convert.reverse(getData()));
     }
 
     /**

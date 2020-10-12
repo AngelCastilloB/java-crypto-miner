@@ -22,12 +22,13 @@
  * SOFTWARE.
  */
 
-package com.thunderbolt.mining;
+package com.thunderbolt.mining.miners;
 
 /* IMPORTS *******************************************************************/
 
 import com.thunderbolt.common.Convert;
 import com.thunderbolt.common.NumberSerializer;
+import com.thunderbolt.mining.Job;
 import com.thunderbolt.mining.contracts.IJobFinishListener;
 import com.thunderbolt.mining.contracts.IMiner;
 import com.thunderbolt.security.Sha256Digester;
@@ -185,10 +186,11 @@ public class CpuMiner implements IMiner
                 if (m_jobQueue.size() > 0 && m_active.get() < THREAD_POOL_SIZE)
                 {
                     Job job = m_jobQueue.take();
-                    s_logger.debug("Starting Job {}:", job.getId());
-                    s_logger.debug(" - Midstate: {}", Convert.toHexString(job.getMidstate()));
-                    s_logger.debug(" - Data:     {}", Convert.toHexString(job.getData()));
-                    s_logger.debug(" - Target:   {}", job.getTarget().toString());
+                    s_logger.debug("Starting Job {}:\n - Midstate: {}\n - Data:     {}\n - Target:   {}",
+                            job.getId(),
+                            Convert.toHexString(job.getMidstate()),
+                            Convert.toHexString(job.getData()),
+                            Convert.padLeft(job.getTarget().toString(), 64, '0'));
 
                     m_executor.execute(() -> solve(job));
                 }
@@ -216,43 +218,39 @@ public class CpuMiner implements IMiner
     {
         m_active.addAndGet(1);
 
-        boolean solved       = false;
-        byte[]  data         = job.getData();
-        byte[]  midstate     = job.getMidstate();
-        long    currentNonce = job.getNonce();
+        boolean solved          = false;
+        byte[]  data            = job.getData();
+        byte[]  midstate        = job.getMidstate();
+        long    currentNonce    = job.getNonce();
+        byte[]  serializedNonce = NumberSerializer.serialize((int)currentNonce);
 
+        System.arraycopy(serializedNonce, 0, data, 12, serializedNonce.length);
+
+        s_logger.debug(Convert.toHexString(serializedNonce));
+        s_logger.debug(Convert.toHexString(data));
+        s_logger.debug(Convert.toHexString(midstate));
         while (!solved && !m_cancelAll && !Thread.interrupted())
         {
             Sha256Digester digester = new Sha256Digester();
-            Sha256Hash hash = Sha256Digester.digest(digester.continuePreviousHash(midstate, data));
+            Sha256Hash hash = Sha256Digester.digest(digester.continuePreviousHash(midstate, data)).reverse();
 
             solved = hash.toBigInteger().compareTo(job.getTarget().getTarget()) <= 0;
             if (solved)
             {
+                job.setSolved(true);
+                job.setNonce(currentNonce);
+
+                s_logger.debug("Job {}: Solved with hash: {}", job.getId(), Convert.toHexString(job.getHash().getData()));
+
                 for (IJobFinishListener listener: m_listeners)
-                {
-                    s_logger.debug("Job {}: Solved with hash: {}", job.getId(), Convert.toHexString(hash.getData()));
-                    job.setSolved(true);
-                    job.setNonce(currentNonce);
-                    job.setHash(hash);
                     listener.onJobFinish(job);
-                    break;
-                }
             }
             // Copy new nonce.
             ++currentNonce;
             if (currentNonce > MAX_UNSIGNED_INT)
                 break;
 
-            byte[] serializedNonce = NumberSerializer.serialize((int)currentNonce);
-            s_logger.debug("Nonce {}", Convert.toHexString(serializedNonce));
-            try
-            {
-                Thread.sleep(1000);
-            } catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
+            serializedNonce = NumberSerializer.serialize((int)currentNonce);
             System.arraycopy(serializedNonce, 0, data, 12, serializedNonce.length);
         }
 
